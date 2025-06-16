@@ -1,0 +1,18 @@
+apiVersion: v2
+name: docintell
+description: AI-powered document intelligence platform
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - ai
+  - documents
+  - chat
+  - rag
+  - llm
+home: https://github.com/yourusername/docintell
+sources:
+  - https://github.com/yourusername/docintell
+maintainers:
+  - name: Developer
+    email: developer@example.com

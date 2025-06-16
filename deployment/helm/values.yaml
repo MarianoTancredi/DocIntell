@@ -1,0 +1,126 @@
+global:
+  imagePullSecrets: []
+
+backend:
+  image:
+    repository: ghcr.io/yourusername/docintell-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  replicaCount: 2
+  
+  service:
+    type: ClusterIP
+    port: 8000
+  
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+  
+  env:
+    LOG_LEVEL: "INFO"
+    SECRET_KEY: "your-secret-key-here"
+    OPENAI_API_KEY: ""  # Set via secrets
+
+frontend:
+  image:
+    repository: ghcr.io/yourusername/docintell-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  replicaCount: 2
+  
+  service:
+    type: ClusterIP
+    port: 80
+  
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+postgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15"
+  
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+  
+  auth:
+    database: docintell
+    username: postgres
+    password: postgres
+  
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+  
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: ""
+  
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: your-domain.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+        - path: /api
+          pathType: Prefix
+          service: backend
+  tls:
+    - secretName: docintell-tls
+      hosts:
+        - your-domain.com
+
+persistence:
+  chromadb:
+    enabled: true
+    size: 20Gi
+    storageClass: ""
+  uploads:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+
+monitoring:
+  prometheus:
+    enabled: true
+  grafana:
+    enabled: true

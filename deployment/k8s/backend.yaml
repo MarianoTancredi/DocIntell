@@ -1,0 +1,138 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-secret
+  namespace: docintell
+type: Opaque
+data:
+  SECRET_KEY: eW91ci1zZWNyZXQta2V5LWhlcmU= # base64 encoded 'your-secret-key-here'
+  OPENAI_API_KEY: # Add your base64 encoded OpenAI API key here
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chromadb-pvc
+  namespace: docintell
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: uploads-pvc
+  namespace: docintell
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docintell-backend
+  namespace: docintell
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: docintell-backend
+  template:
+    metadata:
+      labels:
+        app: docintell-backend
+    spec:
+      containers:
+      - name: backend
+        image: ghcr.io/yourusername/docintell-backend:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: POSTGRES_SERVER
+          value: "postgres"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_DB
+        - name: REDIS_URL
+          value: "redis://redis:6379"
+        - name: CELERY_BROKER_URL
+          value: "redis://redis:6379/0"
+        - name: CELERY_RESULT_BACKEND
+          value: "redis://redis:6379/0"
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backend-secret
+              key: SECRET_KEY
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: backend-secret
+              key: OPENAI_API_KEY
+        - name: LOG_LEVEL
+          value: "INFO"
+        volumeMounts:
+        - name: chromadb-storage
+          mountPath: /app/chromadb
+        - name: uploads-storage
+          mountPath: /app/uploads
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: chromadb-storage
+        persistentVolumeClaim:
+          claimName: chromadb-pvc
+      - name: uploads-storage
+        persistentVolumeClaim:
+          claimName: uploads-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: docintell-backend
+  namespace: docintell
+spec:
+  selector:
+    app: docintell-backend
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
